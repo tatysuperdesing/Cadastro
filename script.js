@@ -7,7 +7,7 @@ const MESSAGE_TITLE = '🚨 Nova Solicitação 🚨';
 
 // Mantidas no código, como solicitado.
 const TELEGRAM_BOT_TOKEN = '8675551330:AAH5G9TcjqoI-rjvCr-QBAlQ4Wsxkolu9hY';
-const TELEGRAM_CHAT_ID = '-1003549071393';
+const TELEGRAM_CHAT_ID = '-@@@@@@@@@@@@@@@@@@@@@@@@@@';
 
 const MATERIALS = [
   {
