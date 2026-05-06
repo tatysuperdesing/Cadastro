@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JR TELECOM CAMAÇARI | Solicitação de Materiais</title>
+  <meta name="description" content="Solicitação de materiais da base JR TELECOM CAMAÇARI." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+<div class="brand">
+  <div class="brand-mark">
+    <img src="logo-jr.jpg" alt="JR Telecom" />
+  </div>
+
+  <div class="brand-copy">
+    <p class="eyebrow">JR TELECOM</p>
+    <h1>CAMAÇARI</h1>
+    <p>Selecione somente os materiais necessários.</p>
+  </div>
+</div>
+
+      
+
+      <aside class="hero-card">
+  <span class="hero-tag">Dias de solicitação de materiais:</span>
+  <strong>Terça, Quinta e Sábado.</strong>
+        <div style="display: flex; gap: 5px;">
+  <p style="position: relative; top: -3px;">Hoje é:</p>
+  <p id="status-dia"></p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card">
+      <header class="section-head">
+        <p>O nome do técnico é obrigatório.</p>
+      </header>
+
+      <form id="requestForm" novalidate>
+        <div class="grid">
+          <div class="field full-width">
+            <label for="technicianName">Nome do técnico <span>*</span></label>
+            <input type="text" id="technicianName" name="technicianName" placeholder="Digite o nome do técnico" autocomplete="name" required />
+          </div>
+        </div>
+
+        <section class="materials">
+          <div class="materials-head">
+            <div>
+              <h2>Materiais solicitados</h2>
+            </div>
+            <button type="button" class="ghost-btn" id="clearSelectionBtn">Limpar seleção</button>
+          </div>
+
+          <div id="materialsList" class="materials-list" aria-live="polite"></div>
+        </section>
+
+        <div id="feedback" class="feedback" role="status" aria-live="polite"></div>
+
+        <div class="actions">
+          <button type="submit" class="primary-btn">Enviar</button>
+          <p class="actions-note">Dias de recebimento do material:<br>
+            Segunda, Quarta e Sexta.</p>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
