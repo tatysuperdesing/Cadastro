@@ -1,504 +1,483 @@
-// JR TELECOM CAMAÇARI
-// Site estático para GitHub Pages com envio ao Telegram.
+// Frontend GitHub Pages para consulta de CPF + Google Sheets via Apps Script.
+// Mantém a lógica do cadastro, confirmação de presença e envio ao Telegram no backend.
 
-const BASE_NAME = 'CAMAÇARI';
-const SECTION_TITLE = '—> PEDIDO DE ESTOQUE <—';
-const MESSAGE_TITLE = '🚨 Nova Solicitação 🚨';
+// 1) Cole aqui a URL do Web App do Google Apps Script (deploy como "Acesso: qualquer pessoa").
+// Exemplo: https://script.google.com/macros/s/SEU_ID/exec
+const APPS_SCRIPT_URL = 'COLE_AQUI_A_URL_DO_WEB_APP_DO_APPS_SCRIPT';
 
-// Mantidas no código, como solicitado.
-const TELEGRAM_BOT_TOKEN = '8675551330:AAH5G9TcjqoI-rjvCr-QBAlQ4Wsxkolu9hY';
-const TELEGRAM_CHAT_ID = '-@@@@@@@@@@@@@@@@@@@@@@@@@@';
+const form = document.getElementById('mainForm');
+const cpfInput = document.getElementById('cpf');
+const cpfHelp = document.getElementById('cpfHelp');
+const cpfStatus = document.getElementById('cpfStatus');
+const submitBtn = document.getElementById('submitBtn');
+const clearBtn = document.getElementById('clearBtn');
 
-const MATERIALS = [
-  {
-    id: 'conectores-apc',
-    name: 'Conectores SC/APC',
-    unitLabel: 'Unidades',
-    type: 'select',
-    options: [10, 20, 30],
-  },
-  {
-    id: 'drop-fibra',
-    name: 'Drop Fibra',
-    unitLabel: 'Metros',
-    type: 'select',
-    options: [1000, 2000],
-  },
-  {
-    id: 'bucha-parafuso',
-    name: 'Bucha & Parafuso',
-    unitLabel: 'Unidades',
-    type: 'select',
-    options: [50, 100],
-  },
-  {
-    id: 'fixa-fio',
-    name: 'Fixa Fio',
-    unitLabel: 'Unidades',
-    type: 'select',
-    options: [100, 200],
-  },
-    {
-    id: 'abracadeira',
-    name: 'Abraçadeira',
-    unitLabel: 'Unidades',
-    type: 'select',
-    options: [100, 200],
-  },
-  {
-    id: 'esticadores',
-    name: 'Esticadores',
-    unitLabel: 'Unidades',
-    type: 'select',
-    options: [50, 100],
-  },
-  {
-    id: 'etiqueta-lacre',
-    name: 'Etiqueta Lacre',
-    unitLabel: 'Cartela (69 etiquetas)',
-    type: 'select',
-    options: [1, 2],
-  },
-  {
-    id: 'espiral',
-    name: 'Espiral',
-    unitLabel: 'Metros',
-    type: 'select',
-    options: [1, 2],
-  },
-  {
-    id: 'placas-jr',
-    name: 'Placas JR',
-    unitLabel: 'Unidades',
-    type: 'select',
-    options: [10, 20, 30],
-  },
-  {
-    id: 'fita-isolante',
-    name: 'Fita Isolante',
-    unitLabel: 'Unidade',
-    type: 'select',
-    options: [1],
-  },
-  {
-    id: 'fita-crepe',
-    name: 'Fita Crepe',
-    unitLabel: 'Unidade',
-    type: 'select',
-    options: [1],
-  },
-  {
-    id: 'bucha-acabamento',
-    name: 'Bucha de Acabamento',
-    unitLabel: 'Unidades',
-    type: 'select',
-    options: [5, 10, 15],
-  },
-];
+const cadastroSection = document.getElementById('cadastroSection');
+const cadastroResumo = document.getElementById('cadastroResumo');
+const nomeEncontrado = document.getElementById('nomeEncontrado');
+const bairroEncontrado = document.getElementById('bairroEncontrado');
 
-const form = document.getElementById('requestForm');
-const technicianInput = document.getElementById('technicianName');
-const feedbackEl = document.getElementById('feedback');
-const materialsListEl = document.getElementById('materialsList');
-const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+const presencaSection = document.getElementById('presencaSection');
+const presencaConfirmada = document.getElementById('presencaConfirmada');
+const eventoSelect = document.getElementById('eventoSelect');
+const eventoManual = document.getElementById('eventoManual');
+const eventoHelp = document.getElementById('eventoHelp');
 
-function pad(value) {
-  return String(value).padStart(2, '0');
+const novoCadastroSection = document.getElementById('novoCadastroSection');
+const cpfNovo = document.getElementById('cpfNovo');
+const nomeCompleto = document.getElementById('nomeCompleto');
+const dataNascimento = document.getElementById('dataNascimento');
+const bairroInput = document.getElementById('bairro');
+const whatsappInput = document.getElementById('whatsapp');
+
+const feedback = document.getElementById('feedback');
+
+const state = {
+  status: 'idle', // idle | typing | invalid | not_found | found | new | saving | success | error
+  cpfDigits: '',
+  lookupTimer: null,
+  lookupAbort: null,
+  foundData: null,
+  eventosDisponiveis: [],
+  lastLookupCpf: '',
+};
+
+function onlyDigits(value) {
+  return String(value || '').replace(/\D/g, '');
 }
 
-function formatDateTime(date = new Date()) {
-  return {
-    date: `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`,
-    time: `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`,
-  };
-}
-
-function sanitizeText(value) {
-  return String(value || '')
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .trim();
-}
-
-function escapeFilename(value) {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9-_]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 60) || 'solicitacao';
-}
-
-function formatQuantity(value, material) {
-  const formattedValue = typeof value === 'number' ? value.toLocaleString('pt-BR') : value;
-
-  if (material.id === 'etiqueta-lacre') {
-    return value === 1 ? '1 cartela (69 etiquetas)' : `${formattedValue} cartelas (138 etiquetas)`;
-  }
-
-  if (material.id === 'drop-fibra' || material.id === 'espiral') {
-    return `${formattedValue} ${material.unitLabel}`;
-  }
-
-  return `${formattedValue} ${material.unitLabel}`;
-}
-
-function showFeedback(type, message) {
-  feedbackEl.className = `feedback show ${type}`;
-  feedbackEl.textContent = message;
-}
-
-function clearFeedback() {
-  feedbackEl.className = 'feedback';
-  feedbackEl.textContent = '';
-}
-
-function formatOptionLabel(material, option) {
-  if (material.id === 'drop-fibra') {
-    return `${option.toLocaleString('pt-BR')} metros`;
-  }
-
-  if (material.id === 'etiqueta-lacre') {
-    return `${option} cartela${option > 1 ? 's' : ''} (69 cada)`;
-  }
-
-  if (material.id === 'espiral') {
-    return `${option} metro${option > 1 ? 's' : ''}`;
-  }
-
-  return `${option} ${material.unitLabel.toLowerCase()}`;
-}
-
-function createMaterialCard(material) {
-  const article = document.createElement('article');
-  article.className = 'material-item';
-  article.dataset.materialId = material.id;
-
-  const helper = material.type === 'number'
-    ? `Limite: de ${material.min} até ${material.max}`
-    : `Opções: ${material.options.map((value) => formatOptionLabel(material, value)).join(', ')}`;
-
-  const control = material.type === 'number'
-    ? `
-      <input
-        type="number"
-        min="${material.min}"
-        max="${material.max}"
-        step="${material.step || 1}"
-        value=""
-        id="${material.id}-qty"
-        class="qty-input"
-        inputmode="numeric"
-        aria-label="Quantidade de ${material.name}"
-        placeholder="0"
-      />
-    `
-    : `
-      <select id="${material.id}-qty" class="qty-input" aria-label="Quantidade de ${material.name}">
-        <option value="">&lt;Selecione&gt;</option>
-        ${material.options.map((option) => `<option value="${option}">${formatOptionLabel(material, option)}</option>`).join('')}
-      </select>
-    `;
-
-  article.innerHTML = `
-    <div class="material-top">
-      <input type="checkbox" id="${material.id}" class="material-check" aria-label="Selecionar ${material.name}" />
-      <div class="material-label">
-        <label for="${material.id}" class="material-name">${material.name}</label>
-        <div class="material-desc">${helper}</div>
-      </div>
-    </div>
-    <div class="qty-wrap">
-      <label for="${material.id}-qty">Quantidade</label>
-      ${control}
-    </div>
-  `;
-
-  const checkbox = article.querySelector('.material-check');
-  const qtyWrap = article.querySelector('.qty-wrap');
-  const qtyInput = article.querySelector('.qty-input');
-
-  const syncSelection = () => {
-    article.classList.toggle('selected', checkbox.checked);
-    qtyWrap.style.display = checkbox.checked ? 'grid' : 'none';
-
-    if (checkbox.checked) {
-      if (material.type === 'select' && qtyInput.value === '') {
-        qtyInput.selectedIndex = 0;
-      }
-      if (material.type === 'number' && qtyInput.value !== '' && Number(qtyInput.value) < material.min) {
-        qtyInput.value = material.min;
-      }
-    }
-  };
-
-  checkbox.addEventListener('change', syncSelection);
-
-  if (material.type === 'number') {
-    qtyInput.addEventListener('input', () => {
-      if (qtyInput.value === '') return;
-      const value = Number(qtyInput.value);
-      if (!Number.isInteger(value) || value < material.min) qtyInput.value = material.min;
-      if (value > material.max) qtyInput.value = material.max;
-    });
-  }
-
-  syncSelection();
-  return article;
-}
-
-function renderMaterials() {
-  materialsListEl.innerHTML = '';
-  MATERIALS.forEach((material) => {
-    materialsListEl.appendChild(createMaterialCard(material));
-  });
-}
-
-function getSelectedMaterials() {
-  const selected = [];
-  document.querySelectorAll('.material-item').forEach((item) => {
-    const checkbox = item.querySelector('.material-check');
-    const qtyInput = item.querySelector('.qty-input');
-    const material = MATERIALS.find((entry) => entry.id === item.dataset.materialId);
-
-    if (!checkbox.checked || !material) return;
-
-    let quantity = null;
-    if (material.type === 'select') {
-      quantity = qtyInput.value === '' ? null : Number(qtyInput.value);
-    } else {
-      quantity = qtyInput.value === '' ? null : Number(qtyInput.value);
-    }
-
-    if (quantity === null || Number.isNaN(quantity)) return;
-    if (!Number.isInteger(quantity) || quantity < material.min || (typeof material.max === 'number' && quantity > material.max)) return;
-    if (quantity === 0) return;
-
-    selected.push({
-      name: material.name,
-      quantity,
-      unitLabel: material.unitLabel,
-      materialId: material.id,
-    });
-  });
-
-  return selected;
-}
-
-function buildTelegramMessage(data, selectedMaterials, generatedAt) {
-  const materialsText = selectedMaterials.length
-    ? selectedMaterials.map((item) => `🔹 ${item.name}: ${formatQuantity(item.quantity, MATERIALS.find((m) => m.id === item.materialId))}`).join('\n')
-    : '🔹 Nenhum material selecionado';
-
-  return [
-    SECTION_TITLE,
-    MESSAGE_TITLE,
-    '',
-    `👷 Técnico: ${data.technicianName}`,
-    `🏢 Base: ${BASE_NAME}`,
-    `📅 Data: ${generatedAt.date}`,
-    `⏰ Horário: ${generatedAt.time}`,
-    '',
-    '🧰 Suprimentos Solicitados:',
-    '------------------------------',
-    materialsText,
-    '------------------------------',
-  ].join('\n');
-}
-
-function validateFields() {
-let valido = true;
-
-const itens = document.querySelectorAll('.material-item');
-
-itens.forEach(item => {
-const checkbox = item.querySelector('input[type="checkbox"]');
-const select = item.querySelector('select');
-const titulo = item.querySelector('.material-name');
-
-// limpa erro
-titulo.classList.remove('erro');
-select.classList.remove('borda-erro');
-
-if (checkbox.checked && (!select.value || select.value === '')) {
-titulo.classList.add('erro');
-select.classList.add('borda-erro');
-valido = false;
-}
-
-});
-
-return valido;
-}
-
-async function sendToTelegram(message) {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID || TELEGRAM_BOT_TOKEN.includes('COLOQUE_') || TELEGRAM_CHAT_ID.includes('COLOQUE_')) {
-    throw new Error('Configure o token e o chat_id do Telegram no código.');
-  }
-
-  if (!validateFields()) {
-    throw new Error('Preencha a quantidade dos itens selecionados!');
-  return;
-  }
-
-  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: TELEGRAM_CHAT_ID,
-      text: message,
-    }),
-  });
-
-  const result = await response.json().catch(() => null);
-  if (!response.ok || !result?.ok) {
-    const description = result?.description || `HTTP ${response.status}`;
-    throw new Error(`Falha ao enviar requisição: ${description}`);
-  }
-
-  downloadTXT(message)
+function formatCpf(value) {
+  const digits = onlyDigits(value).slice(0, 11);
+  const parts = [];
+  if (digits.length > 0) parts.push(digits.slice(0, 3));
+  if (digits.length > 3) parts.push(digits.slice(3, 6));
+  if (digits.length > 6) parts.push(digits.slice(6, 9));
+  let result = '';
+  if (parts[0]) result += parts[0];
+  if (parts[1]) result += '.' + parts[1];
+  if (parts[2]) result += '.' + parts[2];
+  if (digits.length > 9) result += '-' + digits.slice(9, 11);
   return result;
 }
 
-function downloadTXT(conteudo) {
-  const agora = new Date();
-
-  const dia = String(agora.getDate()).padStart(2, '0');
-  const mes = String(agora.getMonth() + 1).padStart(2, '0');
-  const ano = agora.getFullYear();
-
-  const nomeArquivo = `requisicao-estoque-${dia}-${mes}-${ano}.txt`;
-
-  const blob = new Blob([conteudo], { type: 'text/plain;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = nomeArquivo;
-  document.body.appendChild(link);
-  link.click();
-
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+function normalizeCpf(value) {
+  return onlyDigits(value).padStart(11, '0').slice(-11);
 }
 
-function validateForm() {
-  const technicianName = sanitizeText(technicianInput.value);
-  if (!technicianName) {
-    showFeedback('error', 'Informe o nome do técnico antes de enviar.');
-    technicianInput.focus();
-    return false;
+function isRepeatedDigits(cpf) {
+  return /^([0-9])\1{10}$/.test(cpf);
+}
+
+function isValidCpf(cpf) {
+  cpf = onlyDigits(cpf);
+
+  if (cpf.length !== 11) return false;
+  if (isRepeatedDigits(cpf)) return false;
+
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    sum += Number(cpf[i]) * (10 - i);
   }
+  let rest = (sum * 10) % 11;
+  if (rest === 10) rest = 0;
+  if (rest !== Number(cpf[9])) return false;
 
-  const selectedMaterials = getSelectedMaterials();
-  if (!selectedMaterials.length) {
-    showFeedback('error', 'Selecione ao menos um material com quantidade válida.');
-    return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) {
+    sum += Number(cpf[i]) * (11 - i);
   }
+  rest = (sum * 10) % 11;
+  if (rest === 10) rest = 0;
 
-  return true;
+  return rest === Number(cpf[10]);
 }
 
-function collectFormData() {
-  return {
-    technicianName: sanitizeText(technicianInput.value),
-  };
+function setStatus(type, message) {
+  cpfStatus.innerHTML = '';
+  if (!message) return;
+  const box = document.createElement('div');
+  box.className = `status-box show ${type}`;
+  box.textContent = message;
+  cpfStatus.appendChild(box);
 }
 
-function clearSelection() {
-  document.querySelectorAll('.material-item').forEach((item) => {
-    const checkbox = item.querySelector('.material-check');
-    const qtyInput = item.querySelector('.qty-input');
-    const material = MATERIALS.find((entry) => entry.id === item.dataset.materialId);
-
-    checkbox.checked = false;
-    if (material?.type === 'select') {
-      qtyInput.selectedIndex = 0;
-    } else {
-      qtyInput.value = '';
-    }
-    item.classList.remove('selected');
-    item.querySelector('.qty-wrap').style.display = 'none';
-  });
+function setFeedback(type, message) {
+  feedback.className = `feedback show ${type}`;
+  feedback.textContent = message;
 }
 
-function verificarDia() {
-  try {
-  const status = document.getElementById('status-dia');
+function clearFeedback() {
+  feedback.className = 'feedback';
+  feedback.textContent = '';
+  feedback.textContent = '';
+}
 
-  const hoje = new Date().getDay(); 
-  // 0 = domingo, 1 = segunda, 2 = terça...
+function setCpfVisualState(mode) {
+  cpfInput.classList.remove('invalid', 'valid');
+  if (mode === 'invalid' || mode === 'not_found') cpfInput.classList.add('invalid');
+  if (mode === 'found' || mode === 'new') cpfInput.classList.add('valid');
+}
 
-  const diasPermitidos = [2, 4, 6]; // terça, quinta, sábado
+function hideAllPanels() {
+  cadastroSection.classList.add('hidden');
+  presencaSection.classList.add('hidden');
+  novoCadastroSection.classList.add('hidden');
+}
 
-  const nomesDias = [
-    'Domingo',
-    'Segunda-feira',
-    'Terça-feira',
-    'Quarta-feira',
-    'Quinta-feira',
-    'Sexta-feira',
-    'Sábado'
-  ];
+function resetCadastroFields() {
+  nomeCompleto.value = '';
+  dataNascimento.value = '';
+  bairroInput.value = '';
+  whatsappInput.value = '';
+}
 
-  status.textContent = `${nomesDias[hoje]}`;
+function resetPresenceFields() {
+  eventoSelect.innerHTML = '';
+  eventoSelect.classList.add('hidden');
+  eventoManual.value = '';
+  eventoManual.classList.add('hidden');
+  eventoHelp.textContent = '';
+  presencaConfirmada.checked = true;
+}
 
-  if (diasPermitidos.includes(hoje)) {
-    status.classList.add('ok');
-    status.classList.remove('erro');
+function prepareNewCadastro(cpfFormatted) {
+  hideAllPanels();
+  resetPresenceFields();
+
+  novoCadastroSection.classList.remove('hidden');
+  cpfNovo.value = cpfFormatted;
+
+  setStatus('warn', 'CPF não encontrado. Preencha o cadastro para continuar.');
+  setCpfVisualState('not_found');
+  state.status = 'new';
+  submitBtn.disabled = false;
+}
+
+function prepareFoundCadastro(data) {
+  hideAllPanels();
+  cadastroSection.classList.remove('hidden');
+  presencaSection.classList.remove('hidden');
+
+  nomeEncontrado.textContent = data?.nome || '-';
+  bairroEncontrado.textContent = data?.bairro || '-';
+  cadastroResumo.textContent = data?.cpf ? `CPF ${formatCpf(data.cpf)} encontrado no cadastro.` : 'Cadastro encontrado.';
+
+  const eventos = Array.isArray(data?.eventosDisponiveis) ? data.eventosDisponiveis : [];
+  resetPresenceFields();
+
+  if (eventos.length > 0) {
+    eventoSelect.classList.remove('hidden');
+    eventoSelect.innerHTML = `<option value="">Selecione um evento</option>` + eventos
+      .map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`)
+      .join('');
+    eventoHelp.textContent = 'Escolha um evento da lista.';
   } else {
-    status.classList.add('erro');
-    status.classList.remove('ok');
+    eventoManual.classList.remove('hidden');
+    eventoHelp.textContent = 'Nenhum evento disponível foi retornado. Digite o nome do evento manualmente.';
   }
-    } catch (error) {
+
+  setStatus('ok', 'CPF válido e cadastro localizado.');
+  setCpfVisualState('found');
+  state.status = 'found';
+  submitBtn.disabled = false;
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function apiGet(params) {
+  const url = new URL(APPS_SCRIPT_URL);
+  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    mode: 'cors',
+    cache: 'no-store',
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data?.message || `HTTP ${response.status}`);
+  }
+  return data;
+}
+
+async function apiPost(params) {
+  const formData = new FormData();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) formData.append(key, value);
+  });
+
+  const response = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    body: formData,
+    mode: 'cors',
+    cache: 'no-store',
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data?.message || `HTTP ${response.status}`);
+  }
+  return data;
+}
+
+async function lookupCpf(cpfDigits) {
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('COLE_AQUI')) {
+    setStatus('error', 'Cole a URL do Web App do Apps Script no script.js.');
+    setCpfVisualState('invalid');
+    return;
+  }
+
+  if (state.lookupAbort) {
+    state.lookupAbort.abort();
+  }
+  state.lookupAbort = new AbortController();
+
+  state.status = 'typing';
+  setStatus('info', 'Consultando cadastro...');
+  submitBtn.disabled = true;
+
+  try {
+    const data = await apiGet({
+      action: 'consultar',
+      cpf: cpfDigits,
+    });
+
+    if (data?.ok && data.encontrado) {
+      state.foundData = data.cadastro || null;
+      state.eventosDisponiveis = Array.isArray(data.eventosDisponiveis) ? data.eventosDisponiveis : [];
+      state.lastLookupCpf = cpfDigits;
+      prepareFoundCadastro({
+        cpf: cpfDigits,
+        nome: data.cadastro?.nome || '',
+        bairro: data.cadastro?.bairro || '',
+        eventosDisponiveis: state.eventosDisponiveis,
+      });
+      return;
+    }
+
+    state.foundData = null;
+    state.eventosDisponiveis = [];
+    state.lastLookupCpf = cpfDigits;
+    prepareNewCadastro(formatCpf(cpfDigits));
+  } catch (error) {
     console.error(error);
-    showFeedback('error', error.message);
+    setStatus('error', error.message || 'Erro ao consultar o CPF.');
+    setCpfVisualState('invalid');
+    submitBtn.disabled = true;
+  } finally {
+    state.lookupAbort = null;
   }
 }
 
-verificarDia();
+function scheduleLookup() {
+  window.clearTimeout(state.lookupTimer);
+  const digits = onlyDigits(cpfInput.value).slice(0, 11);
 
-const selects = document.querySelectorAll('.qty-input');
+  state.cpfDigits = digits;
+  cpfInput.value = formatCpf(digits);
 
-selects.forEach(select => {
-  const label = document.querySelector(`label[for="${select.id}"]`);
+  if (digits.length === 0) {
+    hideAllPanels();
+    resetPresenceFields();
+    resetCadastroFields();
+    setStatus('info', 'Digite o CPF para iniciar a consulta.');
+    cpfInput.classList.remove('invalid', 'valid');
+    submitBtn.disabled = true;
+    state.status = 'idle';
+    return;
+  }
 
-  const update = () => {
-    label.classList.toggle('label-placeholder', select.value !== '');
+  if (digits.length < 11) {
+    hideAllPanels();
+    resetPresenceFields();
+    setStatus('info', 'Digite os 11 dígitos do CPF.');
+    cpfInput.classList.remove('invalid', 'valid');
+    submitBtn.disabled = true;
+    state.status = 'typing';
+    return;
+  }
+
+  if (!isValidCpf(digits)) {
+    hideAllPanels();
+    resetPresenceFields();
+    setStatus('error', 'CPF inválido. Verifique os dígitos informados.');
+    setCpfVisualState('invalid');
+    submitBtn.disabled = true;
+    state.status = 'invalid';
+    return;
+  }
+
+  setCpfVisualState('found');
+  setStatus('info', 'CPF válido. Verificando no cadastro...');
+  submitBtn.disabled = true;
+  state.status = 'typing';
+
+  state.lookupTimer = window.setTimeout(() => {
+    lookupCpf(digits);
+  }, 350);
+}
+
+function getSelectedEvent() {
+  if (!eventoSelect.classList.contains('hidden')) {
+    return eventoSelect.value.trim();
+  }
+  return eventoManual.value.trim();
+}
+
+function validatePresencePayload() {
+  const evento = getSelectedEvent();
+  if (presencaConfirmada.checked && !evento) {
+    return 'Informe ou selecione um evento.';
+  }
+  return '';
+}
+
+function validateNewCadastro() {
+  if (!nomeCompleto.value.trim()) return 'Informe o nome completo.';
+  if (!dataNascimento.value) return 'Informe a data de nascimento.';
+  if (!bairroInput.value.trim()) return 'Informe o bairro.';
+  if (!onlyDigits(whatsappInput.value).length) return 'Informe o WhatsApp.';
+  return '';
+}
+
+function validateBeforeSubmit() {
+  const cpf = normalizeCpf(cpfInput.value);
+  if (!isValidCpf(cpf)) return 'CPF inválido.';
+  if (state.status === 'new') return validateNewCadastro();
+  if (state.status === 'found') return validatePresencePayload();
+  return 'Digite um CPF válido primeiro.';
+}
+
+async function submitNewCadastro() {
+  const cpf = normalizeCpf(cpfInput.value);
+  const payload = {
+    action: 'salvarCadastro',
+    cpf,
+    nome: nomeCompleto.value.trim(),
+    dataNascimento: dataNascimento.value,
+    email: '',
+    whatsapp: onlyDigits(whatsappInput.value),
+    bairro: bairroInput.value.trim(),
   };
 
-  update();
-  select.addEventListener('change', update);
+  const result = await apiPost(payload);
+  return result;
+}
+
+async function submitPresence() {
+  const cpf = normalizeCpf(cpfInput.value);
+  const nome = (state.foundData?.nome || nomeEncontrado.textContent || '').trim();
+  const bairro = (state.foundData?.bairro || bairroEncontrado.textContent || '').trim();
+  const evento = getSelectedEvent();
+
+  const payload = {
+    action: 'salvarPresenca',
+    cpf,
+    nome,
+    bairro,
+    evento,
+    presenca: presencaConfirmada.checked ? 'sim' : 'nao',
+  };
+
+  const result = await apiPost(payload);
+  return result;
+}
+
+function showSuccess(message) {
+  setFeedback('success', message);
+  setStatus('ok', message);
+}
+
+function showError(message) {
+  setFeedback('error', message);
+  setStatus('error', message);
+}
+
+cpfInput.addEventListener('input', scheduleLookup);
+
+cpfInput.addEventListener('blur', () => {
+  const digits = onlyDigits(cpfInput.value);
+  cpfInput.value = formatCpf(digits);
+});
+
+whatsappInput.addEventListener('input', () => {
+  const digits = onlyDigits(whatsappInput.value).slice(0, 11);
+  if (digits.length <= 10) {
+    whatsappInput.value = digits.replace(/(\d{0,2})(\d{0,5})(\d{0,4}).*/, (_, d1, d2, d3) => {
+      let result = '';
+      if (d1) result += `(${d1}`;
+      if (d1.length === 2) result += ') ';
+      if (d2) result += d2;
+      if (d2.length === 5 && d3) result += '-';
+      if (d3) result += d3;
+      return result;
+    });
+  } else {
+    whatsappInput.value = digits;
+  }
+});
+
+clearBtn.addEventListener('click', () => {
+  form.reset();
+  cpfInput.value = '';
+  cpfNovo.value = '';
+  hideAllPanels();
+  resetPresenceFields();
+  resetCadastroFields();
+  clearFeedback();
+  cpfStatus.innerHTML = '';
+  cpfInput.classList.remove('invalid', 'valid');
+  submitBtn.disabled = true;
+  state.status = 'idle';
+  setStatus('info', 'Digite o CPF para iniciar a consulta.');
+  cpfInput.focus();
 });
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   clearFeedback();
 
-  if (!validateForm()) return;
+  const validationError = validateBeforeSubmit();
+  if (validationError) {
+    showError(validationError);
+    return;
+  }
 
-  const data = collectFormData();
-  const selectedMaterials = getSelectedMaterials();
-  const generatedAt = formatDateTime(new Date());
-  const telegramMessage = buildTelegramMessage(data, selectedMaterials, generatedAt);
+  submitBtn.disabled = true;
+  setStatus('info', 'Enviando...');
 
   try {
-    await sendToTelegram(telegramMessage);
-    showFeedback('success', 'Solicitação enviada com sucesso.');
+    if (state.status === 'new') {
+      const result = await submitNewCadastro();
+      showSuccess(result?.message || 'Cadastro enviado com sucesso.');
+      state.status = 'success';
+      submitBtn.disabled = false;
+      return;
+    }
+
+    if (state.status === 'found') {
+      const result = await submitPresence();
+      showSuccess(result?.message || 'Presença confirmada com sucesso.');
+      state.status = 'success';
+      submitBtn.disabled = false;
+      return;
+    }
+
+    showError('Não foi possível identificar a ação.');
   } catch (error) {
     console.error(error);
-    showFeedback('error', error.message);
+    showError(error.message || 'Erro ao enviar os dados.');
+  } finally {
+    if (state.status !== 'success') {
+      submitBtn.disabled = false;
+    }
   }
 });
 
-clearSelectionBtn.addEventListener('click', () => {
-  clearSelection();
-  showFeedback('info', 'Seleção de materiais limpa.');
-});
-
-renderMaterials();
-
-if (!technicianInput.value) {
-  technicianInput.focus();
-}
+setStatus('info', 'Digite o CPF para iniciar a consulta.');

@@ -3,67 +3,143 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>JR TELECOM CAMAÇARI | Solicitação de Materiais</title>
-  <meta name="description" content="Solicitação de materiais da base JR TELECOM CAMAÇARI." />
+  <title>Prof. Raimundo Bacelar | Cadastro e Presença</title>
+  <meta name="description" content="Cadastro, consulta de CPF e confirmação de presença para GitHub Pages com Google Sheets via Apps Script." />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="page">
     <section class="hero">
-<div class="brand">
-  <div class="brand-mark">
-    <img src="logo-jr.jpg" alt="JR Telecom" />
-  </div>
-
-  <div class="brand-copy">
-    <p class="eyebrow">JR TELECOM</p>
-    <h1>CAMAÇARI</h1>
-    <p>Selecione somente os materiais necessários.</p>
-  </div>
-</div>
-
-      
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">PRB</div>
+        <div class="brand-copy">
+          <p class="eyebrow">Cadastro • Consulta • Presença</p>
+          <h1>Prof. Raimundo Bacelar</h1>
+          <p>
+            Digite o CPF para validar automaticamente, consultar o cadastro e confirmar presença.
+          </p>
+        </div>
+      </div>
 
       <aside class="hero-card">
-  <span class="hero-tag">Dias de solicitação de materiais:</span>
-  <strong>Terça, Quinta e Sábado.</strong>
-        <div style="display: flex; gap: 5px;">
-  <p style="position: relative; top: -3px;">Hoje é:</p>
-  <p id="status-dia"></p>
-        </div>
+        <span class="hero-tag">GitHub Pages + Apps Script</span>
+        <strong>Frontend estático, leitura e gravação no Google Sheets.</strong>
+        <p>O CPF é validado pelo cálculo dos dígitos e a consulta acontece sem botão.</p>
       </aside>
     </section>
 
     <section class="card">
       <header class="section-head">
-        <p>O nome do técnico é obrigatório.</p>
+        <h2>Consulta do CPF</h2>
+        <p>Quando os 11 dígitos estiverem corretos, o sistema consulta automaticamente a planilha.</p>
       </header>
 
-      <form id="requestForm" novalidate>
+      <form id="mainForm" novalidate>
         <div class="grid">
           <div class="field full-width">
-            <label for="technicianName">Nome do técnico <span>*</span></label>
-            <input type="text" id="technicianName" name="technicianName" placeholder="Digite o nome do técnico" autocomplete="name" required />
+            <label for="cpf">CPF <span>*</span></label>
+            <input
+              type="text"
+              id="cpf"
+              name="cpf"
+              placeholder="000.000.000-00"
+              inputmode="numeric"
+              autocomplete="off"
+              maxlength="14"
+              required
+            />
+            <small id="cpfHelp" class="help-text">Digite o CPF completo. A validação é automática.</small>
           </div>
         </div>
 
-        <section class="materials">
-          <div class="materials-head">
-            <div>
-              <h2>Materiais solicitados</h2>
-            </div>
-            <button type="button" class="ghost-btn" id="clearSelectionBtn">Limpar seleção</button>
-          </div>
+        <div id="cpfStatus" class="status" aria-live="polite"></div>
 
-          <div id="materialsList" class="materials-list" aria-live="polite"></div>
+        <section id="cadastroSection" class="panel hidden">
+          <header class="panel-head">
+            <h2>Cadastro encontrado</h2>
+            <p id="cadastroResumo"></p>
+          </header>
+
+          <div class="panel-grid">
+            <div class="mini-card">
+              <span>Nome</span>
+              <strong id="nomeEncontrado">-</strong>
+            </div>
+            <div class="mini-card">
+              <span>Bairro</span>
+              <strong id="bairroEncontrado">-</strong>
+            </div>
+          </div>
+        </section>
+
+        <section id="presencaSection" class="panel hidden">
+          <header class="panel-head">
+            <h2>Confirmação de presença</h2>
+            <p>Selecione o evento disponível ou informe o nome do evento manualmente.</p>
+          </header>
+
+          <div class="grid">
+            <div class="field full-width">
+              <label class="checkbox-label">
+                <input type="checkbox" id="presencaConfirmada" checked />
+                <span>Confirmar presença</span>
+              </label>
+            </div>
+
+            <div class="field full-width">
+              <label for="eventoSelect">Evento</label>
+              <select id="eventoSelect" class="hidden"></select>
+              <input
+                type="text"
+                id="eventoManual"
+                class="hidden"
+                placeholder="Digite o evento que deseja ir"
+                autocomplete="off"
+              />
+              <small id="eventoHelp" class="help-text"></small>
+            </div>
+          </div>
+        </section>
+
+        <section id="novoCadastroSection" class="panel hidden">
+          <header class="panel-head">
+            <h2>Novo cadastro</h2>
+            <p>Como o CPF não foi encontrado, preencha os dados abaixo para salvar na planilha.</p>
+          </header>
+
+          <div class="grid">
+            <div class="field full-width">
+              <label for="cpfNovo">CPF</label>
+              <input type="text" id="cpfNovo" readonly />
+            </div>
+
+            <div class="field full-width">
+              <label for="nomeCompleto">Nome completo <span>*</span></label>
+              <input type="text" id="nomeCompleto" placeholder="Digite o nome completo" autocomplete="name" />
+            </div>
+
+            <div class="field">
+              <label for="dataNascimento">Data de nascimento <span>*</span></label>
+              <input type="date" id="dataNascimento" />
+            </div>
+
+            <div class="field">
+              <label for="bairro">Bairro <span>*</span></label>
+              <input type="text" id="bairro" placeholder="Digite o bairro" autocomplete="address-level3" />
+            </div>
+
+            <div class="field full-width">
+              <label for="whatsapp">WhatsApp <span>*</span></label>
+              <input type="tel" id="whatsapp" placeholder="(00) 00000-0000" autocomplete="tel" />
+            </div>
+          </div>
         </section>
 
         <div id="feedback" class="feedback" role="status" aria-live="polite"></div>
 
         <div class="actions">
-          <button type="submit" class="primary-btn">Enviar</button>
-          <p class="actions-note">Dias de recebimento do material:<br>
-            Segunda, Quarta e Sexta.</p>
+          <button type="submit" class="primary-btn" id="submitBtn" disabled>Enviar</button>
+          <button type="button" class="ghost-btn" id="clearBtn">Limpar</button>
         </div>
       </form>
     </section>
