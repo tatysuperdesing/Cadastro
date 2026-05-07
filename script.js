@@ -3,7 +3,7 @@
 
 // 1) Cole aqui a URL do Web App do Google Apps Script (deploy como "Acesso: qualquer pessoa").
 // Exemplo: https://script.google.com/macros/s/SEU_ID/exec
-const APPS_SCRIPT_URL = 'COLE_AQUI_A_URL_DO_WEB_APP_DO_APPS_SCRIPT';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjmVQ7mglNFilmNUFOPM0vJp5EKcQN86k1_gQPTItQ25GZ56Yhfy1y8dOXVSbZgau84Q/exec';
 
 const form = document.getElementById('mainForm');
 const cpfInput = document.getElementById('cpf');
