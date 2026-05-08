@@ -11,27 +11,27 @@
   <main class="page">
     <section class="hero">
       <div class="brand">
-        <div class="brand-mark" aria-hidden="true">PRB</div>
+        <div class="brand-mark" aria-hidden="true">RB</div>
         <div class="brand-copy">
           <p class="eyebrow">Cadastro • Consulta • Presença</p>
           <h1>Prof. Raimundo Bacelar</h1>
           <p>
-            Digite o CPF para validar automaticamente, consultar o cadastro e confirmar presença.
+            Digite o CPF para confirmar presença.
           </p>
         </div>
       </div>
 
       <aside class="hero-card">
-        <span class="hero-tag">GitHub Pages + Apps Script</span>
-        <strong>Frontend estático, leitura e gravação no Google Sheets.</strong>
-        <p>O CPF é validado pelo cálculo dos dígitos e a consulta acontece sem botão.</p>
+        <span class="hero-tag">Eventos</span>
+        <strong>Participe dos nossos eventos.</strong>
+        <p>Digite seu CPF.</p>
       </aside>
     </section>
 
     <section class="card">
       <header class="section-head">
-        <h2>Consulta do CPF</h2>
-        <p>Quando os 11 dígitos estiverem corretos, o sistema consulta automaticamente a planilha.</p>
+        <h2></h2>
+        <p></p>
       </header>
 
       <form id="mainForm" novalidate>
@@ -48,7 +48,7 @@
               maxlength="14"
               required
             />
-            <small id="cpfHelp" class="help-text">Digite o CPF completo. A validação é automática.</small>
+            <small id="cpfHelp" class="help-text">Digite o CPF completo.</small>
           </div>
         </div>
 
@@ -75,7 +75,7 @@
         <section id="presencaSection" class="panel hidden">
           <header class="panel-head">
             <h2>Confirmação de presença</h2>
-            <p>Selecione o evento disponível ou informe o nome do evento manualmente.</p>
+            <p>Selecione o evento disponível.</p>
           </header>
 
           <div class="grid">
@@ -104,7 +104,7 @@
         <section id="novoCadastroSection" class="panel hidden">
           <header class="panel-head">
             <h2>Novo cadastro</h2>
-            <p>Como o CPF não foi encontrado, preencha os dados abaixo para salvar na planilha.</p>
+            <p>Como o CPF não foi encontrado.</p>
           </header>
 
           <div class="grid">
