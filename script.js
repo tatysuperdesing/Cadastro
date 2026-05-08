@@ -29,6 +29,7 @@ const nomeCompleto = document.getElementById('nomeCompleto');
 const dataNascimento = document.getElementById('dataNascimento');
 const bairroInput = document.getElementById('bairro');
 const whatsappInput = document.getElementById('whatsapp');
+const emailInput = document.getElementById('email');
 
 const feedback = document.getElementById('feedback');
 
