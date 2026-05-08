@@ -407,20 +407,35 @@ cpfInput.addEventListener('blur', () => {
 });
 
 whatsappInput.addEventListener('input', () => {
+
   const digits = onlyDigits(whatsappInput.value).slice(0, 11);
-  if (digits.length <= 10) {
-    whatsappInput.value = digits.replace(/(\d{0,2})(\d{0,5})(\d{0,4}).*/, (_, d1, d2, d3) => {
+
+  whatsappInput.value = digits.replace(
+    /(\d{0,2})(\d{0,5})(\d{0,4})/,
+    (_, d1, d2, d3) => {
+
       let result = '';
-      if (d1) result += `(${d1}`;
-      if (d1.length === 2) result += ') ';
-      if (d2) result += d2;
-      if (d2.length === 5 && d3) result += '-';
-      if (d3) result += d3;
+
+      if (d1) {
+        result += `(${d1}`;
+      }
+
+      if (d1.length === 2) {
+        result += ') ';
+      }
+
+      if (d2) {
+        result += d2;
+      }
+
+      if (d3) {
+        result += '-' + d3;
+      }
+
       return result;
-    });
-  } else {
-    whatsappInput.value = digits;
-  }
+    }
+  );
+
 });
 
 clearBtn.addEventListener('click', () => {
