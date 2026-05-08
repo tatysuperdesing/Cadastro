@@ -362,7 +362,7 @@ async function submitNewCadastro() {
     cpf,
     nome: nomeCompleto.value.trim(),
     dataNascimento: dataNascimento.value,
-    email: '',
+    email: emailInput.value.trim(),
     whatsapp: onlyDigits(whatsappInput.value),
     bairro: bairroInput.value.trim(),
   };
