@@ -190,6 +190,7 @@ select {
 }
 
 input[type="text"],
+input[type="email"],
 input[type="search"],
 input[type="number"],
 input[type="date"],
